@@ -39,11 +39,14 @@ QUEUE="Canon_MF642Cdw_UFRII"
 # Remove every queue that points at this printer, whatever macOS named it.
 # Matching on the device URI also catches AirPrint queues whose names don't
 # mention Canon.
-EXISTING=$(lpstat -v 2>/dev/null | grep -E "$PRINTER_IP|MF642|Canon" | sed -E 's/^device for ([^:]+):.*/\1/')
-for q in $EXISTING; do
-    echo "🗑  Removing existing queue: $q"
-    sudo lpadmin -x "$q" 2>/dev/null
-done
+EXISTING=$(lpstat -v 2>/dev/null | grep -E "${PRINTER_IP//./\\.}|MF642|Canon" | sed -E 's/^device for ([^:]+):.*/\1/')
+if [ -n "$EXISTING" ]; then
+    echo "$EXISTING" | while IFS= read -r q; do
+        [ -z "$q" ] && continue
+        echo "🗑  Removing existing queue: $q"
+        sudo lpadmin -x "$q" 2>/dev/null
+    done
+fi
 
 echo "📡 Building LPD queue to $PRINTER_IP"
 sudo lpadmin -p "$QUEUE" -v "lpd://$PRINTER_IP" -P "$PPD_PATH" -D "Canon MF642Cdw (UFR II)" -o printer-is-shared=false -E
@@ -54,8 +57,8 @@ sudo killall -HUP cupsd
 # Prove which driver the queue actually ended up with. If this says AirPrint,
 # the PPD didn't take and the queue is still doomed to Error 853.
 PPD_USED="/etc/cups/ppd/$QUEUE.ppd"
-if [ -f "$PPD_USED" ]; then
-    echo "   Driver: $(grep -m1 '^\*NickName' "$PPD_USED" | cut -d'"' -f2)"
+if sudo test -f "$PPD_USED"; then
+    echo "   Driver: $(sudo grep -m1 '^\*NickName' "$PPD_USED" | cut -d'"' -f2)"
 fi
 
 echo "✅ Done - '$QUEUE' is now the default printer."

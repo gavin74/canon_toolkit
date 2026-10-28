@@ -11,16 +11,19 @@ the print queue using the official Canon UFR II driver.
 
 ## Finding the printer
 
-Every script resolves the address in the same order:
+Every script resolves the address the same way:
 
 1. An address passed on the command line (`-PrinterIP` on Windows)
 2. `.canon_ip` — a cached last-known address beside the script
 3. Interactive prompt
 
-`config_canon_hardware.sh` and `query_canon_status.sh` add one more step: press
-Enter at the prompt and they **sweep every local subnet for hosts listening on
-port 9100**. That takes a few seconds and finds the printer even after its address
-has changed.
+`config_canon_hardware.sh`, `query_canon_status.sh` and `setup_canon_windows.ps1`
+add a fourth step: press Enter at the prompt and they **sweep every local subnet
+for hosts listening on port 9100**. That takes a couple of seconds and finds the
+printer even after its address has changed.
+
+`setup_canon_mf642.sh` (macOS) is the exception — `lpinfo`, then the cached
+address, then a prompt. No sweep.
 
 `.canon_ip` is written automatically and is git-ignored — it is per-network state,
 not something worth committing.

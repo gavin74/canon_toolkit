@@ -138,7 +138,7 @@ if (-not $PrinterIP) {
 
 # Cache the address the same way the Unix scripts do.
 $ipFile = Join-Path $PSScriptRoot '.canon_ip'
-Set-Content -Path $ipFile -Value $PrinterIP
+Set-Content -Path $ipFile -Value $PrinterIP -NoNewline
 
 $PortName = "IP_$PrinterIP"
 Write-Host "Printer: $PrinterIP"
