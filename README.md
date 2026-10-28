@@ -74,18 +74,35 @@ AirPrint queue straight back. Re-run the script instead.
 
 ### 1. Install the Canon driver
 
-The script does **not** install the driver, and Canon publishes no stable direct
-download URL, so this step is manual. Get **UFR II/UFRII LT Printer Driver &
-Utilities for Mac** from Canon's support page for the MF642Cdw and run the
-installer.
+**Recommended — Homebrew.** The driver is maintained as a cask, currently
+**10.19.26**, with `autobump` enabled and a pinned SHA-256. Homebrew handles the
+version bumps and the Canon CDN path, which is year-stamped and changes:
 
-At time of writing the current release is **V10.19.26**, covering macOS 11.7.11
-through macOS 27.0. Check the support page rather than trusting that number — it
-moves.
+```bash
+brew install --cask canon-ufrii-driver
+```
 
-The script looks for the PPD under `/Library/Printers/PPDs/Contents/Resources`
-and exits with a clear message if it isn't there. It does that check *before*
-prompting for a password.
+The script offers to run this for you if `brew` is present and the driver is
+missing, with a y/N prompt. It never installs anything without asking.
+
+**Manual fallback.** If there's no Homebrew, get **UFR II/UFRII LT Printer Driver
+& Utilities for Mac** from Canon's support page for the MF642Cdw and run the
+installer. Canon exposes no stable direct download URL, so this can't be
+automated reliably.
+
+### How the driver is detected
+
+Not by filename. Canon's PPD may be gzipped or generically named, so the script
+asks CUPS what models it actually has:
+
+```bash
+lpinfo -m | grep -iE 'mf64[0-9]'
+```
+
+and falls back to a PPD file under `/Library/Printers/PPDs/Contents/Resources`
+matching `*MF64*`. If neither turns up anything, it stops **before touching any
+print queue** — it will not delete your existing queues to install a broken one.
+
 
 ### 2. Build the queue
 
