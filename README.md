@@ -47,10 +47,29 @@ chmod +x config_canon_hardware.sh query_canon_status.sh
 
 ## macOS
 
-AirPrint's driver is what triggers Error 853. This script deletes existing
-Canon/AirPrint queues and rebuilds them over **LPD** with the Canon UFR II PPD.
+### The actual problem: macOS uses AirPrint, not the Canon driver
 
-### 1. Install the Canon driver first
+Installing the Canon driver and adding the printer are **two separate things**,
+and macOS gets the second one wrong. Add the printer through System Settings and
+macOS discovers it over Bonjour and creates an **AirPrint** queue using Apple's
+generic driver — even when the Canon UFR II driver is sitting right there
+installed. The vendor driver is only used if a queue is explicitly bound to it.
+
+AirPrint is what triggers **Error 853** on the MF642Cdw. It also removes paper-type
+settings, which is why glossy photo prints smear: the fuser never slows down,
+because AirPrint never tells it the media type.
+
+`setup_canon_mf642.sh` fixes the second half of the problem. It deletes every
+queue pointing at the printer — matched on the device URI, so it catches AirPrint
+queues regardless of what macOS named them — then builds one queue bound to the
+Canon UFR II PPD over **LPD**.
+
+### Do not add the printer through System Settings
+
+If you re-add it via **System Settings → Printers & Scanners → +**, you get the
+AirPrint queue straight back. Re-run the script instead.
+
+### 1. Install the Canon driver
 
 The script does **not** install the driver, and Canon publishes no stable direct
 download URL, so this step is manual. Get **UFR II/UFRII LT Printer Driver &
@@ -82,6 +101,25 @@ gh repo clone gavin74/canon_toolkit /tmp/canon_toolkit && bash /tmp/canon_toolki
 - No `sudo` prefix; the script escalates itself where it needs to.
 - Omit the IP to auto-discover via `lpinfo`, fall back to `.canon_ip`, or be
   prompted. Unlike the PJL scripts, this one does not sweep the subnet.
+
+### 3. Verify it actually took
+
+The script prints the driver the finished queue is bound to:
+
+```
+   Driver: Canon MF642C/643C/644C UFR II
+```
+
+If that line says anything containing **AirPrint**, the PPD didn't take and the
+queue will hit Error 853 again. The script exits before that point if the driver
+is missing, so seeing this line at all is a good sign.
+
+### Caveat: Apple is deprecating PPD queues
+
+Recent macOS releases warn that `lpadmin: Printer drivers are deprecated and will
+stop working in a future version of macOS`. LPD + UFR II is still the working
+approach today, but this is a known expiry date rather than a permanent fix.
+
 
 
 ## Windows
