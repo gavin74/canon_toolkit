@@ -12,9 +12,13 @@ set -u
 
 IP_FILE="$(dirname "$0")/.canon_ip"
 
-PRINTER_IP=$(lpinfo -v 2>/dev/null | grep -i "MF642" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
-[ -z "$PRINTER_IP" ] && [ -f "$IP_FILE" ] && PRINTER_IP=$(cat "$IP_FILE")
-[ -z "$PRINTER_IP" ] && read -p "Printer IP address: " PRINTER_IP
+if [ -n "${1:-}" ]; then
+    PRINTER_IP="$1"
+else
+    PRINTER_IP=$(lpinfo -v 2>/dev/null | grep -i "MF642" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
+    [ -z "$PRINTER_IP" ] && [ -f "$IP_FILE" ] && PRINTER_IP=$(cat "$IP_FILE")
+    [ -z "$PRINTER_IP" ] && read -p "Printer IP address: " PRINTER_IP
+fi
 
 if [ -z "$PRINTER_IP" ]; then
     echo "❌ No printer address given."

@@ -1,5 +1,5 @@
 #!/bin/bash
-IP_FILE=".canon_ip"
+IP_FILE="$(dirname "$0")/.canon_ip"
 if [ -n "$1" ]; then
     PRINTER_IP=$1
 else
