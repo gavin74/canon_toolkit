@@ -1,113 +1,83 @@
 # Canon MF642Cdw CLI Toolkit
 
-Scripts to fix three recurring problems with the Canon imageCLASS MF642Cdw:
+Fixes three recurring problems with the Canon imageCLASS MF642Cdw:
 
-- **Error 853** — the printer crashes with a memory error when driven by macOS AirPrint.
+- **Error 853** — the printer crashes with a memory error when macOS drives it via AirPrint.
 - **Faint prints** — Toner Save left on, or density too low.
-- **Printer randomly going offline** — Windows auto-discovery assigns a flaky WSD port.
+- **Goes offline at random on Windows** — auto-discovery assigns a flaky WSD port.
 
-The scripts either talk to the printer directly over **PJL on TCP 9100**, or rebuild
-the print queue using the official Canon UFR II driver.
+The scripts talk to the printer directly over **PJL on TCP 9100**, or rebuild the
+print queue using Canon's official UFR II driver.
 
-## Quick start (macOS)
+---
 
-**One click.** Clone or download this repo, then double-click
-`Install Canon Printer.command`. It finds the printer on the network, offers to
-install the Canon driver via Homebrew if it's missing, and rebuilds the queue.
-No IP address to look up.
+## Install on a Mac
 
-**Or one command** — no arguments:
+The repo is public — nothing to sign in to, no git, no GitHub account.
 
-```bash
-gh repo clone gavin74/canon_toolkit /tmp/canon_toolkit && bash /tmp/canon_toolkit/setup_canon_mf642.sh
-```
-
-Both do the same thing. If the printer can't be found automatically the script
-asks for its address, but it scans the local subnets first, so normally you type
-nothing at all.
-
-## Finding the printer
-
-Every script resolves the address in this order, stopping at the first hit:
-
-1. An address passed on the command line (`-PrinterIP` on Windows)
-2. `.canon_ip` — a cached last-known address beside the script
-3. A scan: every local subnet swept for hosts listening on port 9100
-4. Interactive prompt
-
-On Windows and the two PJL scripts the scan is triggered by pressing Enter at the
-prompt. `setup_canon_mf642.sh` scans automatically *before* asking, so a clean Mac
-needs no arguments at all.
-
-`.canon_ip` is written automatically and is git-ignored — per-network state, not
-something worth committing.
-
-## Requirements
-
-| Platform | Needs |
-|---|---|
-| Linux / WSL / macOS | `bash`, `netcat` (`nc`), and `lpinfo` from CUPS for auto-discovery |
-| macOS setup | Canon UFR II driver installed (see below), `sudo` |
-| Windows setup | PowerShell **as Administrator**, Canon UFR II driver installed |
-
-## Hardware configuration (any platform)
-
-Forces Letter paper, Toner Save off, density 5 and 600 dpi directly into the
-printer's firmware defaults — independent of any driver, and it survives driver
-reinstalls.
+### Fastest: one line in Terminal
 
 ```bash
-chmod +x config_canon_hardware.sh query_canon_status.sh
-./config_canon_hardware.sh 192.168.50.173   # omit the IP to auto-discover
-./query_canon_status.sh                     # read back product info and status
+curl -fsSLo /tmp/canon.zip https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip \
+  && unzip -oq /tmp/canon.zip -d /tmp \
+  && bash /tmp/canon_toolkit-main/setup_canon_mf642.sh
 ```
 
-## macOS
+No arguments. It downloads, unpacks and runs; the script finds the printer itself.
 
-### The actual problem: macOS uses AirPrint, not the Canon driver
+### No Terminal at all
 
-Installing the Canon driver and adding the printer are **two separate things**,
-and macOS gets the second one wrong. Add the printer through System Settings and
-macOS discovers it over Bonjour and creates an **AirPrint** queue using Apple's
-generic driver — even when the Canon UFR II driver is sitting right there
-installed. The vendor driver is only used if a queue is explicitly bound to it.
+1. Open this link — it downloads immediately, no sign-in:
+   **https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip**
+2. Open **Downloads** and double-click the `.zip`.
+3. Open the folder that appears and **double-click `Install Canon Printer.command`**.
+4. Type your Mac login password when asked — that's for installing the driver.
 
-AirPrint is what triggers **Error 853** on the MF642Cdw. It also removes paper-type
-settings, which is why glossy photo prints smear: the fuser never slows down,
-because AirPrint never tells it the media type.
+Both routes do the same thing: find the printer, install the driver if missing,
+remove the AirPrint queue, and rebuild it properly.
 
-`setup_canon_mf642.sh` fixes the second half of the problem. It deletes every
-queue pointing at the printer — matched on the device URI, so it catches AirPrint
-queues regardless of what macOS named them — then builds one queue bound to the
-Canon UFR II PPD over **LPD**.
+If the Canon driver isn't installed, the script offers to install it via Homebrew.
+Without Homebrew it prints the manual download instructions and stops cleanly.
 
-### Do not add the printer through System Settings
+### If the file won't run
 
-If you re-add it via **System Settings → Printers & Scanners → +**, you get the
-AirPrint queue straight back. Re-run the script instead.
+**"cannot be opened because it is from an unidentified developer"**
+Right-click the file → **Open** → then **Open** again. Only needed once.
 
-### 1. Install the Canon driver
-
-**Recommended — Homebrew.** The driver is maintained as a cask, currently
-**10.19.26**, with `autobump` enabled and a pinned SHA-256. Homebrew handles the
-version bumps and the Canon CDN path, which is year-stamped and changes:
+**"you do not have appropriate access privileges"** (or it opens in TextEdit)
+Rare — GitHub's zip preserves the executable bit — but if it happens, the flag was
+lost. Open **Terminal**, type `cd ` (with a trailing space), drag the folder into
+the Terminal window, press Return, then:
 
 ```bash
-brew install --cask canon-ufrii-driver
+chmod +x "Install Canon Printer.command"
 ```
 
-The script offers to run this for you if `brew` is present and the driver is
-missing, with a y/N prompt. It never installs anything without asking.
+---
 
-**Manual fallback.** If there's no Homebrew, get **UFR II/UFRII LT Printer Driver
-& Utilities for Mac** from Canon's support page for the MF642Cdw and run the
-installer. Canon exposes no stable direct download URL, so this can't be
-automated reliably.
+## Why macOS breaks this printer
 
-### How the driver is detected
+Installing the Canon driver and adding the printer are **two separate things**, and
+macOS gets the second one wrong. Add the printer through System Settings and macOS
+discovers it over Bonjour and creates an **AirPrint** queue using Apple's generic
+driver — even when the Canon UFR II driver is already installed. The vendor driver
+is only used if a queue is explicitly bound to it.
 
-Not by filename. Canon's PPD may be gzipped or generically named, so the script
-asks CUPS what models it actually has:
+AirPrint is what triggers **Error 853**. It also drops paper-type settings, which is
+why glossy prints smear: the fuser never learns the media type, so it never slows
+down.
+
+`setup_canon_mf642.sh` fixes the queue half. It deletes every queue pointing at the
+printer — matched on the *device URI*, so it catches AirPrint queues whatever macOS
+named them — then builds one queue bound to the Canon UFR II driver over **LPD**.
+
+**Do not re-add the printer through System Settings → Printers & Scanners → +.**
+That puts the AirPrint queue straight back. Re-run the script instead.
+
+## Driver detection
+
+Not by filename — Canon's PPD may be gzipped or generically named. The script asks
+CUPS what models it actually has:
 
 ```bash
 lpinfo -m | grep -iE 'mf64[0-9]'
@@ -115,28 +85,15 @@ lpinfo -m | grep -iE 'mf64[0-9]'
 
 and falls back to a PPD file under `/Library/Printers/PPDs/Contents/Resources`
 matching `*MF64*`. If neither turns up anything, it stops **before touching any
-print queue** — it will not delete your existing queues to install a broken one.
+print queue** — it will not delete your working queues to install a broken one.
 
+The driver itself comes from the Homebrew cask `canon-ufrii-driver` (currently
+10.19.26, autobumped, SHA-256 pinned). The script offers to install it with a y/N
+prompt if it's missing; it never installs anything silently. Without Homebrew,
+install **UFR II/UFRII LT Printer Driver & Utilities for Mac** from Canon's support
+page — Canon publishes no stable direct URL, so that step can't be automated.
 
-### 2. Build the queue
-
-```bash
-gh repo clone gavin74/canon_toolkit /tmp/canon_toolkit
-bash /tmp/canon_toolkit/setup_canon_mf642.sh 192.168.50.173
-```
-
-Or as a single line:
-
-```bash
-gh repo clone gavin74/canon_toolkit /tmp/canon_toolkit && bash /tmp/canon_toolkit/setup_canon_mf642.sh 192.168.50.173
-```
-
-- `gh` must be authenticated — the repo is private.
-- No `sudo` prefix; the script escalates itself where it needs to.
-- Omit the IP to auto-discover via `lpinfo`, fall back to `.canon_ip`, or be
-  prompted. Unlike the PJL scripts, this one does not sweep the subnet.
-
-### 3. Verify it actually took
+## Confirming it worked
 
 The script prints the driver the finished queue is bound to:
 
@@ -144,37 +101,61 @@ The script prints the driver the finished queue is bound to:
    Driver: Canon MF642C/643C/644C UFR II
 ```
 
-If that line says anything containing **AirPrint**, the PPD didn't take and the
-queue will hit Error 853 again. The script exits before that point if the driver
-is missing, so seeing this line at all is a good sign.
+If that line contains **AirPrint**, the PPD didn't take and you'll get Error 853
+again.
 
-### Caveat: Apple is deprecating PPD queues
+## Finding the printer
 
-Recent macOS releases warn that `lpadmin: Printer drivers are deprecated and will
-stop working in a future version of macOS`. LPD + UFR II is still the working
-approach today, but this is a known expiry date rather than a permanent fix.
+Every script resolves the address in this order, stopping at the first hit:
 
+1. An address passed on the command line (`-PrinterIP` on Windows)
+2. `.canon_ip` — a cached last-known address beside the script
+3. A scan of every local subnet for hosts listening on port 9100
+4. An interactive prompt
 
+`setup_canon_mf642.sh` scans automatically *before* asking, so a fresh Mac needs no
+arguments. The others scan when you press Enter at the prompt.
+
+`.canon_ip` is written automatically and is git-ignored — per-network state, not
+something worth committing.
 
 ## Windows
 
-Auto-discovery typically produces a WSD port that drops offline at random. This
-script replaces it with a fixed TCP/IP port and applies colour/Letter defaults.
+Auto-discovery normally creates a WSD port, which drops offline at random. The
+script replaces it with a fixed TCP/IP port and applies colour/Letter defaults. Run
+PowerShell **as Administrator**:
 
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force
-.\setup_canon_windows.ps1 -PrinterIP 192.168.50.173
+.\setup_canon_windows.ps1
 ```
 
-Omit `-PrinterIP` to fall back to `.canon_ip` or be prompted.
+Omit `-PrinterIP` to scan, fall back to `.canon_ip`, or be prompted.
 
-## Hardware notes
+## Hardware defaults (any platform)
 
-- **Standard printing** — load 20 lb paper in the main cassette.
-- **Photo printing** — laser-rated glossy paper in the front multi-purpose tray.
+Forces Letter paper, Toner Save off, density 5 and 600 dpi into the printer's
+firmware defaults — independent of any driver, and it survives driver reinstalls.
+
+```bash
+./config_canon_hardware.sh 192.168.50.173   # omit the IP to auto-discover
+./query_canon_status.sh                     # read back product info and status
+```
+
+## Paper and media
+
+- **Standard printing** — 20 lb paper in the main cassette.
+- **Photo printing** — laser-rated glossy stock in the front multi-purpose tray.
   In the print dialog you *must* set Media Type to **Heavy** or **Glossy**, so the
-  fuser slows down and actually melts the toner. On plain settings the toner smears
-  and rubs off.
+  fuser slows down and melts the toner. On Plain the toner smears and rubs off.
+
+## Requirements
+
+| Task | Needs |
+|---|---|
+| macOS setup | macOS, `sudo`, and either Homebrew or the Canon driver pre-installed |
+| Windows setup | PowerShell **as Administrator**, Canon UFR II driver installed |
+| PJL scripts (hardware defaults / status) | `bash`, `netcat` (`nc`), `lpinfo` from CUPS |
 
 ## Troubleshooting
 
@@ -183,8 +164,15 @@ Omit `-PrinterIP` to fall back to `.canon_ip` or be prompted.
 | `No Canon MF64x driver found` | Canon driver not installed | `brew install --cask canon-ufrii-driver`, or install it from Canon's support page |
 | `This queue still reports AirPrint` | The PPD didn't take | Confirm the driver installed, then re-run |
 | `No printer address given` | Scan found nothing on port 9100 | Pass the address: `bash setup_canon_mf642.sh 192.168.50.173` |
-| `No such file or directory` on brew | Homebrew not installed | https://brew.sh, or install the driver manually |
-| macOS won't open the `.command` | Gatekeeper quarantine | Right-click → **Open**, or `xattr -d com.apple.quarantine "Install Canon Printer.command"` |
+| `brew: command not found` | Homebrew not installed | Install from https://brew.sh, or install the driver manually |
+| macOS won't open the `.command` | Gatekeeper quarantine | Right-click → **Open** |
+| `.command` opens in TextEdit | Executable flag lost in the zip | `chmod +x "Install Canon Printer.command"` |
 | Glossy prints still smear | Media Type left on Plain | Set **Heavy** or **Glossy** in the print dialog |
 | Printer drops offline on Windows | WSD port | Re-run `setup_canon_windows.ps1` |
-| `Operation not permitted` from `lpadmin` | Not elevated | Re-run; the script escalates itself |
+| `lpadmin: Operation not permitted` | Not elevated | Re-run; the script escalates itself |
+
+## Known expiry: Apple is deprecating PPD queues
+
+Recent macOS releases warn that `lpadmin: Printer drivers are deprecated and will
+stop working in a future version of macOS`. LPD + UFR II is the working approach
+today, but this is a countdown rather than a permanent fix.
