@@ -9,24 +9,38 @@ Scripts to fix three recurring problems with the Canon imageCLASS MF642Cdw:
 The scripts either talk to the printer directly over **PJL on TCP 9100**, or rebuild
 the print queue using the official Canon UFR II driver.
 
+## Quick start (macOS)
+
+**One click.** Clone or download this repo, then double-click
+`Install Canon Printer.command`. It finds the printer on the network, offers to
+install the Canon driver via Homebrew if it's missing, and rebuilds the queue.
+No IP address to look up.
+
+**Or one command** — no arguments:
+
+```bash
+gh repo clone gavin74/canon_toolkit /tmp/canon_toolkit && bash /tmp/canon_toolkit/setup_canon_mf642.sh
+```
+
+Both do the same thing. If the printer can't be found automatically the script
+asks for its address, but it scans the local subnets first, so normally you type
+nothing at all.
+
 ## Finding the printer
 
-Every script resolves the address the same way:
+Every script resolves the address in this order, stopping at the first hit:
 
 1. An address passed on the command line (`-PrinterIP` on Windows)
 2. `.canon_ip` — a cached last-known address beside the script
-3. Interactive prompt
+3. A scan: every local subnet swept for hosts listening on port 9100
+4. Interactive prompt
 
-`config_canon_hardware.sh`, `query_canon_status.sh` and `setup_canon_windows.ps1`
-add a fourth step: press Enter at the prompt and they **sweep every local subnet
-for hosts listening on port 9100**. That takes a couple of seconds and finds the
-printer even after its address has changed.
+On Windows and the two PJL scripts the scan is triggered by pressing Enter at the
+prompt. `setup_canon_mf642.sh` scans automatically *before* asking, so a clean Mac
+needs no arguments at all.
 
-`setup_canon_mf642.sh` (macOS) is the exception — `lpinfo`, then the cached
-address, then a prompt. No sweep.
-
-`.canon_ip` is written automatically and is git-ignored — it is per-network state,
-not something worth committing.
+`.canon_ip` is written automatically and is git-ignored — per-network state, not
+something worth committing.
 
 ## Requirements
 
@@ -161,3 +175,16 @@ Omit `-PrinterIP` to fall back to `.canon_ip` or be prompted.
   In the print dialog you *must* set Media Type to **Heavy** or **Glossy**, so the
   fuser slows down and actually melts the toner. On plain settings the toner smears
   and rubs off.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `No Canon MF64x driver found` | Canon driver not installed | `brew install --cask canon-ufrii-driver`, or install it from Canon's support page |
+| `This queue still reports AirPrint` | The PPD didn't take | Confirm the driver installed, then re-run |
+| `No printer address given` | Scan found nothing on port 9100 | Pass the address: `bash setup_canon_mf642.sh 192.168.50.173` |
+| `No such file or directory` on brew | Homebrew not installed | https://brew.sh, or install the driver manually |
+| macOS won't open the `.command` | Gatekeeper quarantine | Right-click → **Open**, or `xattr -d com.apple.quarantine "Install Canon Printer.command"` |
+| Glossy prints still smear | Media Type left on Plain | Set **Heavy** or **Glossy** in the print dialog |
+| Printer drops offline on Windows | WSD port | Re-run `setup_canon_windows.ps1` |
+| `Operation not permitted` from `lpadmin` | Not elevated | Re-run; the script escalates itself |

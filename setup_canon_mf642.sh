@@ -17,12 +17,41 @@ QUEUE="Canon_MF642Cdw_UFRII"
 IP_FILE="$(dirname "$0")/.canon_ip"
 CASK="canon-ufrii-driver"
 
+sweep_for_printer() {
+    local subnets found
+    subnets=$(ifconfig 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' \
+        | grep -Eo '([0-9]{1,3}\.){3}' | sort -u | sed 's/\.$//')
+    [ -z "$subnets" ] && return 1
+
+    echo "🔍 Scanning local subnets for port 9100 (~3s)..." >&2
+    found=$(mktemp)
+
+    for subnet in $subnets; do
+        for i in {1..254}; do
+            ( nc -z -w 1 "$subnet.$i" 9100 2>/dev/null && echo "$subnet.$i" >> "$found" ) &
+        done
+    done
+    wait
+
+    head -n 1 "$found" 2>/dev/null
+    rm -f "$found"
+}
+
 if [ -n "${1:-}" ]; then
     PRINTER_IP="$1"
 else
     PRINTER_IP=$(lpinfo -v 2>/dev/null | grep -i "MF64" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
     [ -z "$PRINTER_IP" ] && [ -f "$IP_FILE" ] && PRINTER_IP=$(cat "$IP_FILE")
-    [ -z "$PRINTER_IP" ] && read -p "Printer IP address: " PRINTER_IP
+
+    # No argument, no discovery, no cache: find it on the wire.
+    if [ -z "$PRINTER_IP" ]; then
+        PRINTER_IP=$(sweep_for_printer)
+    fi
+
+    # Only ask if the scan came up empty.
+    if [ -z "$PRINTER_IP" ]; then
+        read -p "Printer IP address: " PRINTER_IP
+    fi
 fi
 
 if [ -z "$PRINTER_IP" ]; then
