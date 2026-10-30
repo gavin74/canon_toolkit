@@ -122,8 +122,15 @@ something worth committing.
 ## Windows
 
 Auto-discovery normally creates a WSD port, which drops offline at random. The
-script replaces it with a fixed TCP/IP port and applies colour/Letter defaults. Run
-PowerShell **as Administrator**:
+script replaces it with a fixed TCP/IP port and applies colour/Letter defaults.
+
+**One line** — open PowerShell **as Administrator** and paste:
+
+```powershell
+$z="$env:TEMP\canon.zip"; iwr https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip -OutFile $z; Expand-Archive $z -DestinationPath $env:TEMP -Force; & "$env:TEMP\canon_toolkit-main\setup_canon_windows.ps1"
+```
+
+Or from a downloaded copy:
 
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force
@@ -131,6 +138,15 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 ```
 
 Omit `-PrinterIP` to scan, fall back to `.canon_ip`, or be prompted.
+
+### The printer must have a stable address
+
+The Windows queue points at one fixed IP. If the printer gets a new address — a new
+DHCP lease, or a different access point — Windows stops printing with no obvious
+error, while macOS keeps working because it scans for the printer each time.
+
+Give the printer a **DHCP reservation** on the router, or a static address outside
+the DHCP pool. That's the durable fix.
 
 ## Hardware defaults (any platform)
 

@@ -26,8 +26,15 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $PrinterName = 'Canon_MF642Cdw_UFRII'
-$DriverMatch = 'Canon MF642C/643C/644C UFR II'
 $PjlPort     = 9100
+
+# Most specific first. Canon ships either a model-specific driver or the
+# "Generic Plus UFR II" one, depending on what was installed.
+$DriverPatterns = @(
+    'Canon MF642C*',
+    'Canon Generic Plus UFR II*',
+    '*UFR II*'
+)
 
 function Get-LocalSubnets {
     $subnets = @()
@@ -151,14 +158,21 @@ else {
     Add-PrinterPort -Name $PortName -PrinterHostAddress $PrinterIP
 }
 
-$driver = Get-PrinterDriver |
-    Where-Object { $_.Name -match [regex]::Escape($DriverMatch) } |
-    Select-Object -First 1
+$allDrivers = Get-PrinterDriver
+$driver = $null
+foreach ($pattern in $DriverPatterns) {
+    $driver = $allDrivers | Where-Object { $_.Name -like $pattern } | Select-Object -First 1
+    if ($driver) { break }
+}
 
 if (-not $driver) {
-    Write-Host 'Canon UFR II driver not found. Install the Canon driver package first.' -ForegroundColor Red
+    Write-Host 'No Canon UFR II driver found. Install the Canon driver package first.' -ForegroundColor Red
+    Write-Host 'Drivers currently installed:' -ForegroundColor Yellow
+    $allDrivers | Select-Object -ExpandProperty Name | ForEach-Object { Write-Host "  $_" }
     exit 1
 }
+
+Write-Host "Using driver: $($driver.Name)"
 
 if (Get-Printer -Name $PrinterName -ErrorAction SilentlyContinue) {
     Write-Host "Removing existing queue '$PrinterName'..."
