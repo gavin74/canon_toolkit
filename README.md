@@ -16,7 +16,7 @@ It will ask for your Mac password. That's normal — installing a printer needs 
 
 ## Details you don't have to read
 
-### What the three choices mean
+### What the choices mean
 
 The button shows what's currently set up, then asks:
 
@@ -25,8 +25,12 @@ The button shows what's currently set up, then asks:
 | **1** Check and fix | Repairs anything that's wrong. Start here. |
 | **2** Wipe and reinstall | Deletes this printer's queues and sets it up from scratch. Use if 1 doesn't help. |
 | **3** Check only | Reports what's wrong and changes nothing. |
+| **4** Full diagnostic | Saves a detailed report to the Desktop, including printer status, queue detail, drivers and recent CUPS errors. Changes nothing. |
 
 If you type anything else, it says so and changes nothing.
+
+Choice 4 writes `canon-diagnostic.txt` to the Desktop. If something needs explaining,
+that file has the answers in it.
 
 ### Windows
 

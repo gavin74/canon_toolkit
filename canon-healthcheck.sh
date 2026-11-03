@@ -18,8 +18,15 @@ IP_FILE="$DIR/.canon_ip"
 QUEUE="Canon_MF642Cdw_UFRII"
 PORT=9100
 DO_FIX=1
+DEBUG=0
 
-[ "${1:-}" = "--check-only" ] && DO_FIX=0
+for arg in "$@"; do
+    case "$arg" in
+        --check-only) DO_FIX=0 ;;
+        --debug)      DO_FIX=0; DEBUG=1 ;;
+        *) : ;;
+    esac
+done
 
 PROBLEMS=""
 add_problem() { PROBLEMS="${PROBLEMS}${1}
@@ -138,6 +145,69 @@ else
 fi
 
 say ""
+
+if [ "$DEBUG" -eq 1 ]; then
+    REPORT="$HOME/Desktop/canon-diagnostic.txt"
+    {
+        echo "Canon MF642Cdw diagnostic"
+        echo "Generated : $(date)"
+        echo "macOS     : $(sw_vers -productVersion 2>/dev/null)"
+        echo "Computer  : $(scutil --get ComputerName 2>/dev/null)"
+        echo "Printer IP: ${PRINTER_IP:-not found}"
+        echo
+        echo "=== printer ports ==="
+        for port in 80 443 515 631 9100; do
+            if [ -n "$PRINTER_IP" ] && nc -z -w 2 "$PRINTER_IP" "$port" 2>/dev/null; then
+                echo "  $port : OPEN"
+            else
+                echo "  $port : closed"
+            fi
+        done
+        echo
+        echo "=== printer status (PJL) ==="
+        if [ -n "$PRINTER_IP" ] && nc -z -w 2 "$PRINTER_IP" 9100 2>/dev/null; then
+            printf '\033%%-12345X@PJL \r\n@PJL INFO STATUS\r\n@PJL INFO ID\r\n\033%%-12345X\r\n' \
+                | nc -w 3 "$PRINTER_IP" 9100 2>/dev/null | tr -d '\r'
+        else
+            echo "  (9100 closed - printer asleep, off, or unreachable)"
+        fi
+        echo
+        echo "=== queues ==="
+        lpstat -p -d 2>&1
+        echo
+        echo "=== devices ==="
+        lpstat -v 2>&1
+        echo
+        echo "=== this queue, in detail ==="
+        lpstat -l -p "$QUEUE" 2>&1
+        echo
+        echo "=== Canon drivers available ==="
+        lpinfo -m 2>/dev/null | grep -iE 'canon|mf64' | head -20
+        echo
+        echo "=== cupsd ==="
+        pgrep -x cupsd >/dev/null 2>&1 && echo "  running" || echo "  NOT running"
+        echo
+        echo "=== recent CUPS errors ==="
+        if sudo -v 2>/dev/null; then
+            sudo tail -n 30 /var/log/cups/error_log 2>/dev/null || echo "  (cannot read error_log)"
+        else
+            echo "  (skipped - no admin rights)"
+        fi
+        echo
+        echo "=== problems detected ==="
+        if [ -z "$PROBLEMS" ]; then
+            echo "  none"
+        else
+            printf '%s' "$PROBLEMS" | sed 's/^/  - /'
+        fi
+    } > "$REPORT" 2>&1
+
+    say "Full report saved to:"
+    say "   $REPORT"
+    say ""
+    say "Send that file when asking for help - it has everything needed."
+    say ""
+fi
 
 if [ -z "$PROBLEMS" ]; then
     say "OK - printer queue is healthy."

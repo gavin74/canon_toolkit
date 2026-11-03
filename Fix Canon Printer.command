@@ -37,15 +37,16 @@ echo
 echo "  1) Check and fix        repair it if anything is wrong   (recommended)"
 echo "  2) Wipe and reinstall   delete this printer's queues, then set it up again"
 echo "  3) Check only           tell me what is wrong, change nothing"
+echo "  4) Full diagnostic      save a detailed report to the Desktop"
 echo
-read -r -p "Choose 1, 2 or 3 [1]: " CHOICE
+read -r -p "Choose 1, 2, 3 or 4 [1]: " CHOICE
 [ -z "$CHOICE" ] && CHOICE=1
 
 case "$CHOICE" in
-    1|2|3) ;;
+    1|2|3|4) ;;
     *)
         echo
-        echo "That isn't 1, 2 or 3 - nothing has been changed."
+        echo "That isn't 1, 2, 3 or 4 - nothing has been changed."
         read -r -p "Press Return to close..." _
         exit 1
         ;;
@@ -105,6 +106,12 @@ case "$CHOICE" in
         echo
         echo "Checking only - nothing will be changed..."
         bash "$BASE/canon-healthcheck.sh" --check-only
+        status=$?
+        ;;
+    4)
+        echo
+        echo "Collecting a full diagnostic - nothing will be changed..."
+        bash "$BASE/canon-healthcheck.sh" --debug
         status=$?
         ;;
 esac
