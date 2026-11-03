@@ -267,3 +267,67 @@ if sudo lpstat -l -p "$QUEUE" 2>/dev/null | grep -qi airprint; then
 fi
 
 echo "✅ Done - '$QUEUE' is now the default printer."
+
+# Configuration being correct is not the same as a page coming out. Ask, and
+# then actually watch the job through the queue.
+echo
+read -p "Print a test page now, to check it really works? (Y/n): " TESTPAGE
+
+case "${TESTPAGE:-Y}" in
+    [Nn]*)
+        echo "Skipped. If printing still fails, run the button and choose 4."
+        ;;
+    *)
+        TMPPAGE=$(mktemp /tmp/canon-test.XXXXXX) || TMPPAGE=""
+        if [ -z "$TMPPAGE" ]; then
+            echo "Could not create a temporary file for the test page."
+            exit 1
+        fi
+
+        {
+            echo "Canon MF642Cdw test page"
+            echo
+            echo "If you can read this, printing works."
+            echo
+            echo "Date   : $(date)"
+            echo "Queue  : $QUEUE"
+            echo "Driver : $DRIVER_LABEL"
+            echo "Printer: $PRINTER_IP"
+        } > "$TMPPAGE"
+
+        start_dots "Sending a test page"
+        lpr -P "$QUEUE" "$TMPPAGE" 2>/dev/null
+        lpr_status=$?
+        stop_dots
+
+        if [ "$lpr_status" -ne 0 ]; then
+            echo "❌ Could not submit the job - lpr failed (exit $lpr_status)."
+            rm -f "$TMPPAGE"
+            exit 1
+        fi
+
+        start_dots "Waiting for the printer to take it"
+        waited=0
+        while [ "$waited" -lt 45 ]; do
+            job=$(lpstat -o "$QUEUE" 2>/dev/null)
+            [ -z "$job" ] && break
+            sleep 1
+            waited=$((waited + 1))
+        done
+        stop_dots
+        rm -f "$TMPPAGE"
+
+        if [ -z "$(lpstat -o "$QUEUE" 2>/dev/null)" ]; then
+            echo "✅ The job was accepted and left the queue - a page should be printing."
+            echo "   If nothing comes out, the problem is the printer, not the Mac."
+        else
+            echo "⚠️  The job is still sitting in the queue after 45 seconds."
+            echo "   That means it was accepted but not printed - usually the printer"
+            echo "   being offline, or a driver problem."
+            echo
+            echo "   Check the printer's screen, then run the button and choose 4 for a"
+            echo "   full diagnostic written to your Desktop."
+            exit 1
+        fi
+        ;;
+esac

@@ -12,6 +12,9 @@ Then **double-click `Fix Printer`** on your Desktop and choose **1**.
 
 It will ask for your Mac password. That's normal — installing a printer needs it.
 
+At the end it offers to print a test page. **Say yes** — a correct-looking queue and a
+real printed page are different things, and the page is the only proof.
+
 ---
 
 ## Details you don't have to read
@@ -28,6 +31,14 @@ The button shows what's currently set up, then asks:
 | **4** Full diagnostic | Saves a detailed report to the Desktop, including printer status, queue detail, drivers and recent CUPS errors. Changes nothing. |
 
 If you type anything else, it says so and changes nothing.
+
+After a successful install or wipe, it asks whether to print a test page. If you say
+yes, it watches the job through the queue for 45 seconds:
+
+- job left the queue → accepted and printed. If no page appears, the problem is the
+  printer, not the Mac.
+- job still sitting in the queue → it was accepted but never printed, which means the
+  printer is offline or the driver is wrong.
 
 Choice 4 writes `canon-diagnostic.txt` to the Desktop. If something needs explaining,
 that file has the answers in it.
