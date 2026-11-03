@@ -30,10 +30,12 @@ SPINNER_STOP="/tmp/.canon-spin.$$"
 # Print the label plus one dot immediately, then tick every 0.4s. The loop
 # exits via a sentinel file that only appears in stop_dots, so it can never be
 # "Terminated" and always shows at least one dot.
+# Progress always goes to stderr, so it shows on screen but is never captured
+# by command substitutions such as $(find_printer).
 start_dots() {
-    printf '%s.' "$1"
+    printf '%s.' "$1" >&2
     rm -f "$SPINNER_STOP" 2>/dev/null
-    ( while [ ! -f "$SPINNER_STOP" ]; do sleep 0.4; printf '.'; done ) &
+    ( while [ ! -f "$SPINNER_STOP" ]; do sleep 0.4; printf '.' >&2; done ) &
     SPINNER_PID=$!
 }
 
@@ -42,7 +44,7 @@ stop_dots() {
     [ -n "$SPINNER_PID" ] && wait "$SPINNER_PID" 2>/dev/null
     rm -f "$SPINNER_STOP" 2>/dev/null
     SPINNER_PID=""
-    printf ' done\n'
+    printf ' done\n' >&2
 }
 
 # Interrupted mid-step: release the spinner so it cannot outlive the script.
@@ -62,15 +64,20 @@ sweep_for_printer() {
     # Stage 1: anything already in the ARP table is alive, so a refused
     # connection comes back immediately. Usually finds the printer in <1s.
     candidates=$(arp -an 2>/dev/null | sed -n 's/.*(\([0-9.]*\)).*/\1/p')
-    for s in $candidates; do
-        if nc -z -w 1 "$s" 9100 2>/dev/null; then
-            printf '%s' "$s"
-            return 0
-        fi
-    done
+    if [ -n "$candidates" ]; then
+        start_dots "Checking hosts this Mac already knows"
+        for s in $candidates; do
+            if nc -z -w 1 "$s" 9100 2>/dev/null; then
+                stop_dots
+                printf '%s' "$s"
+                return 0
+            fi
+        done
+        stop_dots
+    fi
 
-    # Stage 2: full sweep. Slow (up to a minute); only reached on a cold network.
-    echo "🔍 Not in the ARP table - sweeping local subnets (this can take a minute)..." >&2
+    # Stage 2: full sweep. Slow; only reached on a cold network.
+    start_dots "Sweeping the local network (this can take a minute)"
     found=$(mktemp)
 
     for s in $subnets; do
@@ -81,6 +88,7 @@ sweep_for_printer() {
     wait
 
     head -n 1 "$found" 2>/dev/null
+    stop_dots
     rm -f "$found"
 }
 
@@ -99,7 +107,9 @@ for arg in "$@"; do
 done
 
 if [ -z "$PRINTER_IP" ]; then
+    start_dots "Asking macOS where the printer is"
     PRINTER_IP=$(lpinfo -v 2>/dev/null | grep -i "MF64" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
+    stop_dots
 fi
 
 # Reuse the cached address, but only if it still answers. A stale cache must
@@ -112,8 +122,9 @@ if [ -z "$PRINTER_IP" ] && [ "$FORCE" -eq 0 ] && [ -f "$IP_FILE" ]; then
 fi
 
 # Reuse the address an existing queue already points at, if it still answers.
-# This is the common case on a machine that was set up before.
-if [ -z "$PRINTER_IP" ] && [ "$FORCE" -eq 0 ]; then
+# This is a live check, not a cached assumption, so it is safe even with --force -
+# and it avoids a slow sweep in the common case.
+if [ -z "$PRINTER_IP" ]; then
     queued=$(lpstat -v 2>/dev/null | sed -n "s/^device for ${QUEUE}: //p")
     if [ -n "$queued" ]; then
         qh=$(printf '%s' "$queued" | sed -E 's#^[A-Za-z]+://##; s#/.*$##; s#:[0-9]+$##')
