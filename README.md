@@ -9,23 +9,36 @@ Fixes three recurring problems with the Canon imageCLASS MF642Cdw:
 The scripts talk to the printer directly over **PJL on TCP 9100**, or rebuild the
 print queue using Canon's official UFR II driver.
 
+## One line
+
+**macOS** — paste into Terminal:
+
+```bash
+curl -fsSLo /tmp/canon.zip https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip && unzip -oq /tmp/canon.zip -d /tmp && bash /tmp/canon_toolkit-main/setup_canon_mf642.sh
+```
+
+**Windows** — paste into PowerShell **as Administrator**:
+
+```powershell
+$z="$env:TEMP\canon.zip"; iwr https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip -OutFile $z; Expand-Archive $z -DestinationPath $env:TEMP -Force; & "$env:TEMP\canon_toolkit-main\setup_canon_windows.ps1"
+```
+
+Both find the printer themselves — no IP address needed.
+
+**Already set up but not printing?** Run `canon-healthcheck.sh` on the Mac. It
+diagnoses the queue and repairs it in one go:
+
+```bash
+curl -fsSLo /tmp/canon.zip https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip && unzip -oq /tmp/canon.zip -d /tmp && bash /tmp/canon_toolkit-main/canon-healthcheck.sh
+```
+
 ---
 
 ## Install on a Mac
 
 The repo is public — nothing to sign in to, no git, no GitHub account.
 
-### Fastest: one line in Terminal
-
-```bash
-curl -fsSLo /tmp/canon.zip https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip \
-  && unzip -oq /tmp/canon.zip -d /tmp \
-  && bash /tmp/canon_toolkit-main/setup_canon_mf642.sh
-```
-
-No arguments. It downloads, unpacks and runs; the script finds the printer itself.
-
-### No Terminal at all
+The one-liner is at the top of this page. If you'd rather not use Terminal at all:
 
 1. Open this link — it downloads immediately, no sign-in:
    **https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip**
