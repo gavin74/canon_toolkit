@@ -74,9 +74,13 @@ if [ -z "$PRINTER_IP" ]; then
     PRINTER_IP=$(lpinfo -v 2>/dev/null | grep -i "MF64" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
 fi
 
-# A cached address is only reused unless the user asked for a clean slate.
+# Reuse the cached address, but only if it still answers. A stale cache must
+# never silently point the new queue at a dead printer.
 if [ -z "$PRINTER_IP" ] && [ "$FORCE" -eq 0 ] && [ -f "$IP_FILE" ]; then
-    PRINTER_IP=$(cat "$IP_FILE")
+    cached=$(cat "$IP_FILE")
+    if [ -n "$cached" ] && nc -z -w 2 "$cached" 9100 2>/dev/null; then
+        PRINTER_IP="$cached"
+    fi
 fi
 
 # Reuse the address an existing queue already points at, if it still answers.
@@ -105,6 +109,20 @@ fi
 if [ -z "$PRINTER_IP" ]; then
     echo "❌ No printer address given."
     exit 1
+fi
+
+# Never tear down a working queue for a printer we cannot actually reach.
+if ! nc -z -w 3 "$PRINTER_IP" 9100 2>/dev/null; then
+    echo
+    echo "⚠️  Nothing answers at $PRINTER_IP on port 9100."
+    echo "   The printer may be asleep, switched off, or at a different address."
+    echo "   No existing queues will be touched unless you continue."
+    echo
+    read -p "Continue anyway and replace the existing queues? (y/N): " PROCEED
+    case "${PROCEED:-}" in
+        [Yy]*) ;;
+        *) echo "Stopped. Nothing was changed."; exit 1 ;;
+    esac
 fi
 
 # ---------------------------------------------------------------------------
