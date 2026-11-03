@@ -20,7 +20,8 @@
 set -u
 
 QUEUE="Canon_MF642Cdw_UFRII"
-IP_FILE="$(dirname "$0")/.canon_ip"
+SELF_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+IP_FILE="$SELF_DIR/.canon_ip"
 CASK="canon-ufrii-driver"
 
 # --- progress dots, so a slow step does not look like a hang -----------------
@@ -278,22 +279,31 @@ case "${TESTPAGE:-Y}" in
         echo "Skipped. If printing still fails, run the button and choose 4."
         ;;
     *)
-        TMPPAGE=$(mktemp /tmp/canon-test.XXXXXX) || TMPPAGE=""
+        TMPPAGE=$(mktemp /tmp/canon-test.XXXXXX.pdf) || TMPPAGE=""
         if [ -z "$TMPPAGE" ]; then
             echo "Could not create a temporary file for the test page."
             exit 1
         fi
 
-        {
-            echo "Canon MF642Cdw test page"
-            echo
-            echo "If you can read this, printing works."
-            echo
-            echo "Date   : $(date)"
-            echo "Queue  : $QUEUE"
-            echo "Driver : $DRIVER_LABEL"
-            echo "Printer: $PRINTER_IP"
-        } > "$TMPPAGE"
+        # A colour page with swatches and a gradation ramp tells you far more
+        # than a page of black text. Falls back to text if the helper is absent.
+        if [ -f "$SELF_DIR/canon-testpage.sh" ]; then
+            bash "$SELF_DIR/canon-testpage.sh" "$TMPPAGE" \
+                "$QUEUE" "$DRIVER_LABEL" "$PRINTER_IP" >/dev/null 2>&1
+        fi
+
+        if [ ! -s "$TMPPAGE" ]; then
+            {
+                echo "Canon MF642Cdw test page"
+                echo
+                echo "If you can read this, printing works."
+                echo
+                echo "Date   : $(date)"
+                echo "Queue  : $QUEUE"
+                echo "Driver : $DRIVER_LABEL"
+                echo "Printer: $PRINTER_IP"
+            } > "$TMPPAGE"
+        fi
 
         start_dots "Sending a test page"
         lpr -P "$QUEUE" "$TMPPAGE" 2>/dev/null
