@@ -2,13 +2,12 @@
 #
 # Fix Canon Printer.command
 #
-# Double-click this after the printer stops working. It downloads the latest
-# setup script and re-runs it, which:
-#   - finds the printer wherever it currently is (no IP needed)
-#   - removes any AirPrint queue macOS created behind your back
-#   - rebuilds the queue against the Canon UFR II driver
+# Double-click this file. It asks what you want to do, then does exactly that.
+# Nothing happens without you choosing.
 #
-# Put it on the Desktop and rename it "Fix Printer" if that's friendlier.
+# Put it on the Desktop:
+#   curl -fsSL "https://raw.githubusercontent.com/gavin74/canon_toolkit/main/Fix%20Canon%20Printer.command" \
+#     -o "$HOME/Desktop/Fix Printer.command" && chmod +x "$HOME/Desktop/Fix Printer.command"
 #
 # If macOS refuses to run it: right-click -> Open, once.
 #
@@ -17,43 +16,82 @@ set -u
 URL="https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip"
 TMP=$(mktemp -d)
 
-echo "======================================"
-echo "  Canon MF642Cdw - repair"
-echo "======================================"
+echo "=============================================="
+echo "  Canon MF642Cdw - printer repair"
+echo "=============================================="
 echo
 
-echo
-echo "--- current print queues ---"
-lpstat -v 2>/dev/null | sed 's/^/  /' || echo "  (none)"
-echo
-echo "  lpd://  = our queue, pointing at an address"
-echo "  dnssd:// = an AirPrint queue (the one that breaks this printer)"
+echo "Set up on this Mac right now:"
+if lpstat -v 2>/dev/null | grep -q .; then
+    lpstat -v 2>/dev/null | sed 's/^/   /'
+else
+    echo "   (no printers)"
+fi
 echo
 
-echo "Downloading the latest setup script..."
+echo "What would you like to do?"
+echo
+echo "  1) Check and fix        repair it if anything is wrong   (recommended)"
+echo "  2) Wipe and reinstall   delete this printer's queues, then set it up again"
+echo "  3) Check only           tell me what is wrong, change nothing"
+echo
+read -r -p "Choose 1, 2 or 3 [1]: " CHOICE
+[ -z "$CHOICE" ] && CHOICE=1
+
+case "$CHOICE" in
+    1|2|3) ;;
+    *)
+        echo
+        echo "That isn't 1, 2 or 3 - nothing has been changed."
+        read -r -p "Press Return to close..." _
+        exit 1
+        ;;
+esac
+
+echo
+echo "Downloading the latest scripts..."
 if ! curl -fsSLo "$TMP/canon.zip" "$URL"; then
     echo
-    echo "❌ Download failed. Is this Mac online?"
+    echo "Download failed. Is this Mac online?"
     read -r -p "Press Return to close..." _
     exit 1
 fi
 
 if ! unzip -oq "$TMP/canon.zip" -d "$TMP"; then
-    echo "❌ Could not unzip the download."
+    echo
+    echo "Could not unzip the download."
     read -r -p "Press Return to close..." _
     exit 1
 fi
 
-echo
-bash "$TMP/canon_toolkit-main/setup_canon_mf642.sh" "$@"
-status=$?
+BASE="$TMP/canon_toolkit-main"
+
+case "$CHOICE" in
+    1)
+        echo
+        echo "Checking, and repairing anything that is wrong..."
+        bash "$BASE/canon-healthcheck.sh"
+        status=$?
+        ;;
+    2)
+        echo
+        echo "Removing this printer's queues and installing it again from scratch..."
+        bash "$BASE/setup_canon_mf642.sh" --force
+        status=$?
+        ;;
+    3)
+        echo
+        echo "Checking only - nothing will be changed..."
+        bash "$BASE/canon-healthcheck.sh" --check-only
+        status=$?
+        ;;
+esac
 
 echo
 if [ $status -eq 0 ]; then
-    echo "✅ Printer repaired."
+    echo "Done."
 else
-    echo "❌ Repair failed (exit $status)."
-    echo "   Scroll up for the reason - usually the Canon driver is missing."
+    echo "Finished with a problem (exit $status). Scroll up for the details."
 fi
 
 read -r -p "Press Return to close..." _

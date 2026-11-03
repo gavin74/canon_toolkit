@@ -56,34 +56,50 @@ sweep_for_printer() {
     rm -f "$found"
 }
 
-if [ -n "${1:-}" ]; then
-    PRINTER_IP="$1"
-else
+# --- arguments (used by the desktop menu; users do not need these) -----------
+#   --force      ignore the cached address and rebuild from scratch
+#   --skip-scan  never scan the network
+FORCE=0
+PRINTER_IP=""
+for arg in "$@"; do
+    case "$arg" in
+        --force)      FORCE=1 ;;
+        --skip-scan)  SKIP_SCAN=1 ;;
+        [0-9]*.[0-9]*.[0-9]*.[0-9]*) PRINTER_IP="$arg" ;;
+        *) echo "Ignoring unknown argument: $arg" >&2 ;;
+    esac
+done
+
+if [ -z "$PRINTER_IP" ]; then
     PRINTER_IP=$(lpinfo -v 2>/dev/null | grep -i "MF64" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
-    [ -z "$PRINTER_IP" ] && [ -f "$IP_FILE" ] && PRINTER_IP=$(cat "$IP_FILE")
+fi
 
-    # Reuse the address an existing queue already points at, if it still answers.
-    # This is the common case on a machine that was set up before.
-    if [ -z "$PRINTER_IP" ]; then
-        queued=$(lpstat -v 2>/dev/null | sed -n "s/^device for ${QUEUE}: //p")
-        if [ -n "$queued" ]; then
-            qh=$(printf '%s' "$queued" | sed -E 's#^[A-Za-z]+://##; s#/.*$##; s#:[0-9]+$##')
-            case "$qh" in
-                ''|*[!0-9.]*) : ;;
-                *) nc -z -w 2 "$qh" 9100 2>/dev/null && PRINTER_IP="$qh" ;;
-            esac
-        fi
-    fi
+# A cached address is only reused unless the user asked for a clean slate.
+if [ -z "$PRINTER_IP" ] && [ "$FORCE" -eq 0 ] && [ -f "$IP_FILE" ]; then
+    PRINTER_IP=$(cat "$IP_FILE")
+fi
 
-    # Last resort: find it on the wire.
-    if [ -z "$PRINTER_IP" ] && [ "${SKIP_SCAN:-0}" != "1" ]; then
-        PRINTER_IP=$(sweep_for_printer)
+# Reuse the address an existing queue already points at, if it still answers.
+# This is the common case on a machine that was set up before.
+if [ -z "$PRINTER_IP" ] && [ "$FORCE" -eq 0 ]; then
+    queued=$(lpstat -v 2>/dev/null | sed -n "s/^device for ${QUEUE}: //p")
+    if [ -n "$queued" ]; then
+        qh=$(printf '%s' "$queued" | sed -E 's#^[A-Za-z]+://##; s#/.*$##; s#:[0-9]+$##')
+        case "$qh" in
+            ''|*[!0-9.]*) : ;;
+            *) nc -z -w 2 "$qh" 9100 2>/dev/null && PRINTER_IP="$qh" ;;
+        esac
     fi
+fi
 
-    # Only ask if the scan came up empty.
-    if [ -z "$PRINTER_IP" ]; then
-        read -p "Printer IP address: " PRINTER_IP
-    fi
+# Last resort: find it on the wire.
+if [ -z "$PRINTER_IP" ] && [ "${SKIP_SCAN:-0}" != "1" ]; then
+    PRINTER_IP=$(sweep_for_printer)
+fi
+
+# Only ask if everything above came up empty.
+if [ -z "$PRINTER_IP" ]; then
+    read -p "Printer IP address: " PRINTER_IP
 fi
 
 if [ -z "$PRINTER_IP" ]; then

@@ -18,9 +18,18 @@ double-clickable file straight to the Desktop:
 curl -fsSL "https://raw.githubusercontent.com/gavin74/canon_toolkit/main/Fix%20Canon%20Printer.command" -o "$HOME/Desktop/Fix Printer.command" && chmod +x "$HOME/Desktop/Fix Printer.command"
 ```
 
-**Step 2 — double-click `Fix Printer` on the Desktop.** It finds the printer,
-installs the driver if needed, removes any AirPrint queue, and rebuilds it
-properly. It re-downloads the current script each run, so it never goes stale.
+**Step 2 — double-click `Fix Printer` on the Desktop.** It shows what's currently
+set up on the Mac, then asks what you want:
+
+```
+  1) Check and fix        repair it if anything is wrong   (recommended)
+  2) Wipe and reinstall   delete this printer's queues, then set it up again
+  3) Check only           tell me what is wrong, change nothing
+```
+
+Nothing happens until you choose. If you type something other than 1, 2 or 3 it
+says so and changes nothing. It re-downloads the current scripts each run, so it
+never goes stale.
 
 > **It will ask for a password.** That's `sudo`. Use the **macOS account password
 > of an administrator** — the same one you type to unlock the Mac. It is *not*
