@@ -9,7 +9,13 @@
 # This removes every queue pointing at the printer and rebuilds it over LPD
 # bound to the Canon UFR II driver.
 #
-# Address resolution: lpinfo auto-discovery -> .canon_ip -> interactive prompt.
+# Address resolution order:
+#   1. an address passed as $1
+#   2. lpinfo auto-discovery
+#   3. .canon_ip (the address this script found last time)
+#   4. the host an existing queue already points at, if it still answers
+#   5. ARP table, then a full subnet sweep (set SKIP_SCAN=1 to disable)
+#   6. interactive prompt
 #
 set -u
 
