@@ -73,6 +73,21 @@ broke:
 No terminal, no questions, no IP to look up. If you'd rather keep one file handy,
 this is a single self-contained script — it fetches what it needs.
 
+### Health check from the command line
+
+`canon-healthcheck.sh` inspects the Mac and repairs it if needed. It checks that
+the printer answers, that the queue exists, that the queue points at the printer's
+*current* address (not a stale one), that it isn't an AirPrint queue, and that it's
+the default.
+
+```bash
+./canon-healthcheck.sh                # check, then repair if anything is wrong
+./canon-healthcheck.sh --check-only   # diagnose only, change nothing
+```
+
+Exit code is `0` when healthy or repaired, `1` when still broken — so it's safe to
+use from a scheduled job or a login hook.
+
 To see what was actually wrong before repairing it, run `lpstat -v` on the Mac. The
 device URI shows whether it's pointing at an IP (`lpd://192.168.50.174`) or at an
 AirPrint service (`dnssd://...`).
