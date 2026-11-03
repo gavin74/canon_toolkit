@@ -55,6 +55,30 @@ chmod +x "Install Canon Printer.command"
 
 ---
 
+## When it breaks again
+
+Every Mac keeps its **own** print queue. When someone adds the printer through
+System Settings, macOS quietly creates an **AirPrint** queue and the trouble comes
+back. When that happens, don't debug it — **double-click
+`Fix Canon Printer.command`**. Rename it "Fix Printer" and put it on the Desktop so
+anyone in the house can use it.
+
+It re-downloads the current script and re-runs it, repairing whichever of these
+broke:
+
+- the queue is pointing at a stale IP address
+- macOS created an AirPrint queue behind your back
+- the printer was added with the wrong driver
+
+No terminal, no questions, no IP to look up. If you'd rather keep one file handy,
+this is a single self-contained script — it fetches what it needs.
+
+To see what was actually wrong before repairing it, run `lpstat -v` on the Mac. The
+device URI shows whether it's pointing at an IP (`lpd://192.168.50.174`) or at an
+AirPrint service (`dnssd://...`).
+
+---
+
 ## Why macOS breaks this printer
 
 Installing the Canon driver and adding the printer are **two separate things**, and
