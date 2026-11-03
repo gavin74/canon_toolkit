@@ -22,6 +22,14 @@ echo "  Canon MF642Cdw - repair"
 echo "======================================"
 echo
 
+echo
+echo "--- current print queues ---"
+lpstat -v 2>/dev/null | sed 's/^/  /' || echo "  (none)"
+echo
+echo "  lpd://  = our queue, pointing at an address"
+echo "  dnssd:// = an AirPrint queue (the one that breaks this printer)"
+echo
+
 echo "Downloading the latest setup script..."
 if ! curl -fsSLo "$TMP/canon.zip" "$URL"; then
     echo
