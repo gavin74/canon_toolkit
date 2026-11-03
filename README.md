@@ -124,36 +124,16 @@ chmod +x "Install Canon Printer.command"
 
 Every Mac keeps its **own** print queue. When someone adds the printer through
 System Settings, macOS quietly creates an **AirPrint** queue and the trouble comes
-back. When that happens, don't debug it — **double-click
-`Fix Canon Printer.command`**. Rename it "Fix Printer" and put it on the Desktop so
-anyone in the house can use it.
-
-It re-downloads the current script and re-runs it, repairing whichever of these
-broke:
+back. When that happens, don't debug it — double-click **Fix Printer** and choose
+**1 (check and fix)**. That handles whichever of these broke:
 
 - the queue is pointing at a stale IP address
 - macOS created an AirPrint queue behind your back
 - the printer was added with the wrong driver
 
-### Put the button on any Mac
-
-Run this once on each Mac. It writes the button straight to the Desktop — no
-unzipping, no dragging:
-
-```bash
-curl -fsSL "https://raw.githubusercontent.com/gavin74/canon_toolkit/main/Fix%20Canon%20Printer.command" -o "$HOME/Desktop/Fix Printer.command" && chmod +x "$HOME/Desktop/Fix Printer.command"
-```
-
-Then double-click **Fix Printer**.
-
-The file is self-contained: it downloads the current script from GitHub each time it
-runs, so it never goes stale and doesn't need this repo sitting on the machine.
-
-If macOS says it can't be opened, right-click it → **Open** → **Open** again. That's
-only needed once.
-
-No terminal, no questions, no IP to look up. If you'd rather keep one file handy,
-this is a single self-contained script — it fetches what it needs.
+To put the button on another Mac, jump back to
+[One click on a Mac](#one-click-on-a-mac) — it's a single Terminal command that
+writes the file to the Desktop.
 
 ### Health check from the command line
 
