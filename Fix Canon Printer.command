@@ -16,6 +16,9 @@ set -u
 URL="https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip"
 TMP=$(mktemp -d)
 
+# Do not leave a background download running if this is interrupted.
+trap '[ -n "${CURL_PID:-}" ] && kill "$CURL_PID" 2>/dev/null' EXIT INT TERM
+
 echo "=============================================="
 echo "  Canon MF642Cdw - printer repair"
 echo "=============================================="
@@ -73,7 +76,15 @@ if ! unzip -oq "$TMP/canon.zip" -d "$TMP"; then
     exit 1
 fi
 
-BASE="$TMP/canon_toolkit-main"
+BASE=$(find "$TMP" -maxdepth 1 -type d -name 'canon_toolkit-*' 2>/dev/null | head -n 1)
+
+if [ -z "$BASE" ] || [ ! -f "$BASE/canon-healthcheck.sh" ]; then
+    echo
+    echo "The download did not contain what was expected."
+    echo "Nothing has been changed."
+    read -r -p "Press Return to close..." _
+    exit 1
+fi
 
 case "$CHOICE" in
     1)

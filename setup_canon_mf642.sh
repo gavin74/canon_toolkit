@@ -39,6 +39,15 @@ stop_dots() {
     printf '\n'
 }
 
+# If the script is interrupted mid-spinner, do not leave a background loop
+# printing dots forever.
+cleanup_spinner() {
+    if [ -n "${SPINNER_PID:-}" ]; then
+        kill "$SPINNER_PID" 2>/dev/null
+    fi
+}
+trap cleanup_spinner EXIT INT TERM
+
 sweep_for_printer() {
     local subnets found s i candidates
 
