@@ -123,6 +123,20 @@ if [ "${DEFAULT_PRINTER:-}" != "$QUEUE" ]; then
     add_problem "Default printer is '${DEFAULT_PRINTER:-none}', not $QUEUE"
 fi
 
+# Driver check - read-only, and the thing most likely to block a repair.
+DRIVER_MODEL=$(lpinfo -m 2>/dev/null | awk '{print $1}' | grep -iE 'mf64[0-9]' | head -n 1)
+if [ -n "$DRIVER_MODEL" ]; then
+    say "  driver  : $DRIVER_MODEL"
+else
+    DRIVER_PPD=$(find /Library/Printers/PPDs/Contents/Resources -type f -iname '*MF64*' -print -quit 2>/dev/null)
+    if [ -n "$DRIVER_PPD" ]; then
+        say "  driver  : $(basename "$DRIVER_PPD")"
+    else
+        say "  driver  : NOT FOUND"
+        add_problem "No Canon MF64x driver installed - a repair would have to install it first"
+    fi
+fi
+
 say ""
 
 if [ -z "$PROBLEMS" ]; then
