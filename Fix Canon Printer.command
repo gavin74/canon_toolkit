@@ -13,15 +13,29 @@
 #
 set -u
 
+VERSION="2026-11-03"
+
 URL="https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip"
 TMP=$(mktemp -d)
 SPINNER_STOP="/tmp/.canon-dl.$$"
+
+# Work out a version for a given copy of this script. Prefers the explicit
+# VERSION line; falls back to a short content hash so it is never blank.
+self_version() {
+    local v
+    v=$(sed -n 's/^VERSION="\(.*\)"$/\1/p' "$1" 2>/dev/null | head -n 1)
+    if [ -n "$v" ]; then
+        printf '%s' "$v"
+    else
+        shasum -a 256 "$1" 2>/dev/null | cut -c1-7
+    fi
+}
 
 # Interrupted mid-download: release the ticker so it cannot outlive the script.
 trap 'touch "$SPINNER_STOP" 2>/dev/null' EXIT INT TERM
 
 echo "=============================================="
-echo "  Canon MF642Cdw - printer repair"
+echo "  Canon MF642Cdw - printer repair   (v$VERSION)"
 echo "=============================================="
 
 # --- fetch the latest scripts BEFORE asking anything ------------------------
@@ -66,14 +80,21 @@ fi
 NEW_SELF="$BASE/Fix Canon Printer.command"
 if [ "${CANON_UPDATED:-0}" != "1" ] && [ -f "$NEW_SELF" ]; then
     if ! cmp -s "$NEW_SELF" "$0"; then
+        OLD_VERSION=$(self_version "$0")
+        NEW_VERSION=$(self_version "$NEW_SELF")
         echo
-        echo "This repair tool has a newer version. Updating it now."
+        echo "A newer version of this tool is available."
+        if [ -n "$OLD_VERSION" ]; then
+            echo "   Updating from v$OLD_VERSION to v$NEW_VERSION"
+        else
+            echo "   Updating to v$NEW_VERSION"
+        fi
         if cp "$NEW_SELF" "$0" 2>/dev/null && chmod +x "$0" 2>/dev/null; then
             echo "Restarting with the new version..."
             export CANON_UPDATED=1
             exec bash "$0"
         else
-            echo "Could not update this file, so continuing with the old one."
+            echo "Could not update this file, so continuing with v$OLD_VERSION."
             echo "It still works; only the menu may be out of date."
         fi
     fi
