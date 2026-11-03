@@ -2,8 +2,8 @@
 #
 # Fix Canon Printer.command
 #
-# Double-click this file. It asks what you want to do, then does exactly that.
-# Nothing happens without you choosing.
+# Double-click this file. It checks for a newer version of itself, then asks what
+# you want to do. Nothing is changed without you choosing.
 #
 # Put it on the Desktop:
 #   curl -fsSL "https://raw.githubusercontent.com/gavin74/canon_toolkit/main/Fix%20Canon%20Printer.command" \
@@ -15,15 +15,72 @@ set -u
 
 URL="https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip"
 TMP=$(mktemp -d)
+SPINNER_STOP="/tmp/.canon-dl.$$"
 
 # Interrupted mid-download: release the ticker so it cannot outlive the script.
-trap '[ -n "${SPINNER_STOP:-}" ] && touch "$SPINNER_STOP" 2>/dev/null' EXIT INT TERM
+trap 'touch "$SPINNER_STOP" 2>/dev/null' EXIT INT TERM
 
 echo "=============================================="
 echo "  Canon MF642Cdw - printer repair"
 echo "=============================================="
-echo
 
+# --- fetch the latest scripts BEFORE asking anything ------------------------
+echo
+printf 'Checking for updates.'
+rm -f "$SPINNER_STOP" 2>/dev/null
+( while [ ! -f "$SPINNER_STOP" ]; do sleep 0.4; printf '.' >&2; done ) &
+TICKER=$!
+curl -fsSLo "$TMP/canon.zip" "$URL"
+CURL_RC=$?
+touch "$SPINNER_STOP" 2>/dev/null
+wait "$TICKER" 2>/dev/null
+rm -f "$SPINNER_STOP" 2>/dev/null
+printf ' done\n'
+
+if [ "$CURL_RC" -ne 0 ]; then
+    echo
+    echo "Could not download the latest version. Is this Mac online?"
+    echo "Nothing has been changed."
+    read -r -p "Press Return to close..." _
+    exit 1
+fi
+
+if ! unzip -oq "$TMP/canon.zip" -d "$TMP"; then
+    echo
+    echo "Could not unzip the download. Nothing has been changed."
+    read -r -p "Press Return to close..." _
+    exit 1
+fi
+
+BASE=$(find "$TMP" -maxdepth 1 -type d -name 'canon_toolkit-*' 2>/dev/null | head -n 1)
+
+if [ -z "$BASE" ] || [ ! -f "$BASE/canon-healthcheck.sh" ] || [ ! -f "$BASE/setup_canon_mf642.sh" ]; then
+    echo
+    echo "The download did not contain what was expected."
+    echo "Nothing has been changed."
+    read -r -p "Press Return to close..." _
+    exit 1
+fi
+
+# --- update this button if a newer one exists ------------------------------
+NEW_SELF="$BASE/Fix Canon Printer.command"
+if [ "${CANON_UPDATED:-0}" != "1" ] && [ -f "$NEW_SELF" ]; then
+    if ! cmp -s "$NEW_SELF" "$0"; then
+        echo
+        echo "This repair tool has a newer version. Updating it now."
+        if cp "$NEW_SELF" "$0" 2>/dev/null && chmod +x "$0" 2>/dev/null; then
+            echo "Restarting with the new version..."
+            export CANON_UPDATED=1
+            exec bash "$0"
+        else
+            echo "Could not update this file, so continuing with the old one."
+            echo "It still works; only the menu may be out of date."
+        fi
+    fi
+fi
+
+# --- show what is set up, then ask ----------------------------------------
+echo
 echo "Set up on this Mac right now:"
 if lpstat -v 2>/dev/null | grep -q .; then
     lpstat -v 2>/dev/null | sed 's/^/   /'
@@ -51,43 +108,6 @@ case "$CHOICE" in
         exit 1
         ;;
 esac
-
-echo
-# Label + one dot immediately, then tick until the download finishes.
-printf 'Downloading the latest scripts.'
-SPINNER_STOP="/tmp/.canon-dl.$$"
-rm -f "$SPINNER_STOP" 2>/dev/null
-( while [ ! -f "$SPINNER_STOP" ]; do sleep 0.4; printf '.'; done ) &
-CURL_TICKER=$!
-curl -fsSLo "$TMP/canon.zip" "$URL"
-CURL_RC=$?
-touch "$SPINNER_STOP" 2>/dev/null
-wait "$CURL_TICKER" 2>/dev/null
-rm -f "$SPINNER_STOP" 2>/dev/null
-printf ' done\n'
-
-if [ "$CURL_RC" -ne 0 ]; then
-    echo "Download failed. Is this Mac online?"
-    read -r -p "Press Return to close..." _
-    exit 1
-fi
-
-if ! unzip -oq "$TMP/canon.zip" -d "$TMP"; then
-    echo
-    echo "Could not unzip the download."
-    read -r -p "Press Return to close..." _
-    exit 1
-fi
-
-BASE=$(find "$TMP" -maxdepth 1 -type d -name 'canon_toolkit-*' 2>/dev/null | head -n 1)
-
-if [ -z "$BASE" ] || [ ! -f "$BASE/canon-healthcheck.sh" ]; then
-    echo
-    echo "The download did not contain what was expected."
-    echo "Nothing has been changed."
-    read -r -p "Press Return to close..." _
-    exit 1
-fi
 
 case "$CHOICE" in
     1)

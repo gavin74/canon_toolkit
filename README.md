@@ -32,6 +32,10 @@ The button shows what's currently set up, then asks:
 
 If you type anything else, it says so and changes nothing.
 
+Each time it runs, the button **updates itself first** if a newer version exists, then
+restarts with the new one. That way your Desktop copy never drifts out of date — which
+is otherwise the usual problem with a downloaded script of this kind.
+
 After a successful install or wipe, it asks whether to print a test page. If you say
 yes, it watches the job through the queue for 45 seconds:
 
