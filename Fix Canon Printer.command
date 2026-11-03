@@ -49,9 +49,18 @@ case "$CHOICE" in
 esac
 
 echo
-echo "Downloading the latest scripts..."
-if ! curl -fsSLo "$TMP/canon.zip" "$URL"; then
-    echo
+printf 'Downloading the latest scripts'
+curl -fsSLo "$TMP/canon.zip" "$URL" &
+CURL_PID=$!
+while kill -0 "$CURL_PID" 2>/dev/null; do
+    printf '.'
+    sleep 0.4
+done
+wait "$CURL_PID"
+CURL_RC=$?
+printf '\n'
+
+if [ "$CURL_RC" -ne 0 ]; then
     echo "Download failed. Is this Mac online?"
     read -r -p "Press Return to close..." _
     exit 1

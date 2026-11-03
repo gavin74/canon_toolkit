@@ -23,6 +23,22 @@ QUEUE="Canon_MF642Cdw_UFRII"
 IP_FILE="$(dirname "$0")/.canon_ip"
 CASK="canon-ufrii-driver"
 
+# --- progress dots, so a slow step does not look like a hang -----------------
+SPINNER_PID=""
+start_dots() {
+    printf '%s' "$1"
+    ( while :; do printf '.'; sleep 0.4; done ) &
+    SPINNER_PID=$!
+}
+stop_dots() {
+    if [ -n "$SPINNER_PID" ]; then
+        kill "$SPINNER_PID" 2>/dev/null
+        wait "$SPINNER_PID" 2>/dev/null
+        SPINNER_PID=""
+    fi
+    printf '\n'
+}
+
 sweep_for_printer() {
     local subnets found s i candidates
 
@@ -132,9 +148,11 @@ fi
 find_model() { lpinfo -m 2>/dev/null | awk '{print $1}' | grep -iE 'mf64[0-9]' | head -n 1; }
 find_ppd()   { find /Library/Printers/PPDs/Contents/Resources -type f -iname '*MF64*' -print -quit 2>/dev/null; }
 
+start_dots "Looking for the Canon driver"
 DRIVER_MODEL=$(find_model)
 DRIVER_PPD=""
 [ -z "$DRIVER_MODEL" ] && DRIVER_PPD=$(find_ppd)
+stop_dots
 
 if [ -z "$DRIVER_MODEL" ] && [ -z "$DRIVER_PPD" ]; then
     echo "❌ No Canon MF64x driver found on this Mac."
@@ -177,26 +195,45 @@ fi
 # Remove every queue pointing at this printer, whatever macOS named it.
 # Matching on the device URI also catches AirPrint queues whose names don't
 # mention Canon.
+start_dots "Checking what is set up already"
 EXISTING=$(lpstat -v 2>/dev/null | grep -E "${PRINTER_IP//./\\.}|MF64|Canon" | sed -E 's/^device for ([^:]+):.*/\1/')
+stop_dots
+
 if [ -n "$EXISTING" ]; then
-    echo "$EXISTING" | while IFS= read -r q; do
+    echo "Existing queue(s) to replace:"
+    printf '%s\n' "$EXISTING" | sed 's/^/   - /'
+    start_dots "Removing them"
+    printf '%s\n' "$EXISTING" | while IFS= read -r q; do
         [ -z "$q" ] && continue
-        echo "🗑  Removing existing queue: $q"
         sudo lpadmin -x "$q" 2>/dev/null
     done
+    stop_dots
 fi
 
-echo "📡 Building LPD queue to $PRINTER_IP"
+start_dots "Building the new queue for $PRINTER_IP"
 if [ -n "$DRIVER_MODEL" ]; then
     sudo lpadmin -p "$QUEUE" -v "lpd://$PRINTER_IP" -m "$DRIVER_MODEL" \
-        -D "Canon MF642Cdw (UFR II)" -o printer-is-shared=false -E
+        -D "Canon MF642Cdw (UFR II)" -o printer-is-shared=false -E >/dev/null 2>&1
+    build_status=$?
 else
     sudo lpadmin -p "$QUEUE" -v "lpd://$PRINTER_IP" -P "$DRIVER_PPD" \
-        -D "Canon MF642Cdw (UFR II)" -o printer-is-shared=false -E
+        -D "Canon MF642Cdw (UFR II)" -o printer-is-shared=false -E >/dev/null 2>&1
+    build_status=$?
 fi
-sudo lpadmin -p "$QUEUE" -o CNColorMode=Color -o CNTonerSave=False -o PageSize=Letter -o Resolution=600dpi
-sudo lpoptions -d "$QUEUE"
-sudo killall -HUP cupsd
+sudo lpadmin -p "$QUEUE" -o CNColorMode=Color -o CNTonerSave=False -o PageSize=Letter -o Resolution=600dpi >/dev/null 2>&1
+sudo lpoptions -d "$QUEUE" >/dev/null 2>&1
+stop_dots
+
+if [ "$build_status" -ne 0 ]; then
+    echo "❌ Could not create the print queue (lpadmin failed)."
+    echo "   Nothing else was changed. Try: sudo lpadmin -p $QUEUE -v lpd://$PRINTER_IP -m \"$DRIVER_LABEL\" -E"
+    exit 1
+fi
+
+start_dots "Restarting the print system"
+sudo killall -HUP cupsd 2>/dev/null
+sleep 1
+stop_dots
 
 # Prove which driver the queue actually ended up with. If this says AirPrint,
 # the queue is still doomed to Error 853.
