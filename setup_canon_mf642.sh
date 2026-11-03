@@ -25,26 +25,29 @@ CASK="canon-ufrii-driver"
 
 # --- progress dots, so a slow step does not look like a hang -----------------
 SPINNER_PID=""
+SPINNER_STOP="/tmp/.canon-spin.$$"
+
+# Print the label plus one dot immediately, then tick every 0.4s. The loop
+# exits via a sentinel file that only appears in stop_dots, so it can never be
+# "Terminated" and always shows at least one dot.
 start_dots() {
-    printf '%s' "$1"
-    ( while :; do printf '.'; sleep 0.4; done ) &
+    printf '%s.' "$1"
+    rm -f "$SPINNER_STOP" 2>/dev/null
+    ( while [ ! -f "$SPINNER_STOP" ]; do sleep 0.4; printf '.'; done ) &
     SPINNER_PID=$!
 }
+
 stop_dots() {
-    if [ -n "$SPINNER_PID" ]; then
-        kill "$SPINNER_PID" 2>/dev/null
-        wait "$SPINNER_PID" 2>/dev/null
-        SPINNER_PID=""
-    fi
-    printf '\n'
+    touch "$SPINNER_STOP" 2>/dev/null
+    [ -n "$SPINNER_PID" ] && wait "$SPINNER_PID" 2>/dev/null
+    rm -f "$SPINNER_STOP" 2>/dev/null
+    SPINNER_PID=""
+    printf ' done\n'
 }
 
-# If the script is interrupted mid-spinner, do not leave a background loop
-# printing dots forever.
+# Interrupted mid-step: release the spinner so it cannot outlive the script.
 cleanup_spinner() {
-    if [ -n "${SPINNER_PID:-}" ]; then
-        kill "$SPINNER_PID" 2>/dev/null
-    fi
+    touch "${SPINNER_STOP:-/nonexistent}" 2>/dev/null
 }
 trap cleanup_spinner EXIT INT TERM
 

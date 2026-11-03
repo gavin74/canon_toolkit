@@ -16,8 +16,8 @@ set -u
 URL="https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip"
 TMP=$(mktemp -d)
 
-# Do not leave a background download running if this is interrupted.
-trap '[ -n "${CURL_PID:-}" ] && kill "$CURL_PID" 2>/dev/null' EXIT INT TERM
+# Interrupted mid-download: release the ticker so it cannot outlive the script.
+trap '[ -n "${SPINNER_STOP:-}" ] && touch "$SPINNER_STOP" 2>/dev/null' EXIT INT TERM
 
 echo "=============================================="
 echo "  Canon MF642Cdw - printer repair"
@@ -52,16 +52,18 @@ case "$CHOICE" in
 esac
 
 echo
-printf 'Downloading the latest scripts'
-curl -fsSLo "$TMP/canon.zip" "$URL" &
-CURL_PID=$!
-while kill -0 "$CURL_PID" 2>/dev/null; do
-    printf '.'
-    sleep 0.4
-done
-wait "$CURL_PID"
+# Label + one dot immediately, then tick until the download finishes.
+printf 'Downloading the latest scripts.'
+SPINNER_STOP="/tmp/.canon-dl.$$"
+rm -f "$SPINNER_STOP" 2>/dev/null
+( while [ ! -f "$SPINNER_STOP" ]; do sleep 0.4; printf '.'; done ) &
+CURL_TICKER=$!
+curl -fsSLo "$TMP/canon.zip" "$URL"
 CURL_RC=$?
-printf '\n'
+touch "$SPINNER_STOP" 2>/dev/null
+wait "$CURL_TICKER" 2>/dev/null
+rm -f "$SPINNER_STOP" 2>/dev/null
+printf ' done\n'
 
 if [ "$CURL_RC" -ne 0 ]; then
     echo "Download failed. Is this Mac online?"
