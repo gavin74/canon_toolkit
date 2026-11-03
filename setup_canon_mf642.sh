@@ -18,17 +18,30 @@ IP_FILE="$(dirname "$0")/.canon_ip"
 CASK="canon-ufrii-driver"
 
 sweep_for_printer() {
-    local subnets found
-    subnets=$(ifconfig 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' \
-        | grep -Eo '([0-9]{1,3}\.){3}' | sort -u | sed 's/\.$//')
+    local subnets found s i candidates
+
+    subnets=$(ifconfig 2>/dev/null \
+        | awk '/inet / && $2 != "127.0.0.1" {print $2}' \
+        | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+)\.[0-9]+$/\1/' | sort -u)
     [ -z "$subnets" ] && return 1
 
-    echo "🔍 Scanning local subnets for port 9100 (~3s)..." >&2
+    # Stage 1: anything already in the ARP table is alive, so a refused
+    # connection comes back immediately. Usually finds the printer in <1s.
+    candidates=$(arp -an 2>/dev/null | sed -n 's/.*(\([0-9.]*\)).*/\1/p')
+    for s in $candidates; do
+        if nc -z -w 1 "$s" 9100 2>/dev/null; then
+            printf '%s' "$s"
+            return 0
+        fi
+    done
+
+    # Stage 2: full sweep. Slow (up to a minute); only reached on a cold network.
+    echo "🔍 Not in the ARP table - sweeping local subnets (this can take a minute)..." >&2
     found=$(mktemp)
 
-    for subnet in $subnets; do
+    for s in $subnets; do
         for i in {1..254}; do
-            ( nc -z -w 1 "$subnet.$i" 9100 2>/dev/null && echo "$subnet.$i" >> "$found" ) &
+            ( nc -z -w 1 "$s.$i" 9100 2>/dev/null && echo "$s.$i" >> "$found" ) &
         done
     done
     wait
@@ -43,8 +56,21 @@ else
     PRINTER_IP=$(lpinfo -v 2>/dev/null | grep -i "MF64" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
     [ -z "$PRINTER_IP" ] && [ -f "$IP_FILE" ] && PRINTER_IP=$(cat "$IP_FILE")
 
-    # No argument, no discovery, no cache: find it on the wire.
+    # Reuse the address an existing queue already points at, if it still answers.
+    # This is the common case on a machine that was set up before.
     if [ -z "$PRINTER_IP" ]; then
+        queued=$(lpstat -v 2>/dev/null | sed -n "s/^device for ${QUEUE}: //p")
+        if [ -n "$queued" ]; then
+            qh=$(printf '%s' "$queued" | sed -E 's#^[A-Za-z]+://##; s#/.*$##; s#:[0-9]+$##')
+            case "$qh" in
+                ''|*[!0-9.]*) : ;;
+                *) nc -z -w 2 "$qh" 9100 2>/dev/null && PRINTER_IP="$qh" ;;
+            esac
+        fi
+    fi
+
+    # Last resort: find it on the wire.
+    if [ -z "$PRINTER_IP" ] && [ "${SKIP_SCAN:-0}" != "1" ]; then
         PRINTER_IP=$(sweep_for_printer)
     fi
 
