@@ -9,28 +9,71 @@ Fixes three recurring problems with the Canon imageCLASS MF642Cdw:
 The scripts talk to the printer directly over **PJL on TCP 9100**, or rebuild the
 print queue using Canon's official UFR II driver.
 
-## One line
+## One click on a Mac
 
-**macOS** — paste into Terminal:
+**Step 1 — make the button.** Paste this into Terminal. It writes a
+double-clickable file straight to the Desktop:
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/gavin74/canon_toolkit/main/Fix%20Canon%20Printer.command" -o "$HOME/Desktop/Fix Printer.command" && chmod +x "$HOME/Desktop/Fix Printer.command"
+```
+
+**Step 2 — double-click `Fix Printer` on the Desktop.** It finds the printer,
+installs the driver if needed, removes any AirPrint queue, and rebuilds it
+properly. It re-downloads the current script each run, so it never goes stale.
+
+> **It will ask for a password.** That's `sudo`. Use the **macOS account password
+> of an administrator** — the same one you type to unlock the Mac. It is *not*
+> your Apple ID password. If it's rejected, the account isn't an administrator;
+> see [Needs an administrator account](#needs-an-administrator-account).
+
+### Or one line, no button
 
 ```bash
 curl -fsSLo /tmp/canon.zip https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip && unzip -oq /tmp/canon.zip -d /tmp && bash /tmp/canon_toolkit-main/setup_canon_mf642.sh
 ```
 
-**Windows** — paste into PowerShell **as Administrator**:
+### Already working, but not printing?
+
+```bash
+curl -fsSLo /tmp/canon.zip https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip && unzip -oq /tmp/canon.zip -d /tmp && bash /tmp/canon_toolkit-main/canon-healthcheck.sh
+```
+
+That reports what's wrong *and* repairs it.
+
+### Windows
+
+Paste into PowerShell **as Administrator**:
 
 ```powershell
 $z="$env:TEMP\canon.zip"; iwr https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip -OutFile $z; Expand-Archive $z -DestinationPath $env:TEMP -Force; & "$env:TEMP\canon_toolkit-main\setup_canon_windows.ps1"
 ```
 
-Both find the printer themselves — no IP address needed.
+All of these find the printer themselves — no IP address needed.
 
-**Already set up but not printing?** Run `canon-healthcheck.sh` on the Mac. It
-diagnoses the queue and repairs it in one go:
+---
+
+## Needs an administrator account
+
+Adding a print queue is a system-level change. macOS requires admin rights for it
+whether you use this script or System Settings, so there's no way around it.
+
+Check whether the account is an administrator:
 
 ```bash
-curl -fsSLo /tmp/canon.zip https://github.com/gavin74/canon_toolkit/archive/refs/heads/main.zip && unzip -oq /tmp/canon.zip -d /tmp && bash /tmp/canon_toolkit-main/canon-healthcheck.sh
+id -Gn | tr ' ' '\n' | grep -x admin && echo "you are an admin" || echo "NOT an admin"
 ```
+
+If it says **NOT an admin**, you need someone with admin rights to either:
+
+- grant the account admin: **System Settings → Users & Groups → (user) → Allow this
+  user to administer this computer**, or
+- add the printer themselves once. After that it keeps working for everyone.
+
+If you *are* an admin and the password is still rejected, make sure you're using the
+**login password**, not the Apple ID. On a managed or school/work Mac, an MDM
+profile may block printer changes entirely — in that case the script will fail at
+`lpadmin` and nothing else will help.
 
 ---
 
