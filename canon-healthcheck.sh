@@ -27,12 +27,29 @@ add_problem() { PROBLEMS="${PROBLEMS}${1}
 
 say() { printf '%s\n' "$*"; }
 
+# lpd://192.168.50.174  /  lpd://192.168.50.174/  /  ipp://host:631/ipp/print
+# Compare hosts, not raw strings - CUPS normalises URIs.
+uri_host() {
+    printf '%s' "$1" | sed -E 's#^[A-Za-z]+://##; s#/.*$##; s#:[0-9]+$##'
+}
+
 # ---------------------------------------------------------------------------
 # Find the printer: lpinfo, then the cached address, then sweep the subnets.
 # A cached address is only trusted if it actually answers.
 # ---------------------------------------------------------------------------
 find_printer() {
-    local ip subnets found s i
+    local ip subnets found s i queued qh
+
+    # If an existing queue already points somewhere that answers, trust it.
+    # This avoids sweeping (and waking the printer) on an otherwise healthy Mac.
+    queued=$(lpstat -v 2>/dev/null | sed -n "s/^device for ${QUEUE}: //p")
+    if [ -n "$queued" ]; then
+        qh=$(uri_host "$queued")
+        if [ -n "$qh" ] && nc -z -w 2 "$qh" "$PORT" 2>/dev/null; then
+            printf '%s' "$qh"
+            return 0
+        fi
+    fi
 
     ip=$(lpinfo -v 2>/dev/null | grep -i 'MF64' \
         | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
@@ -91,8 +108,8 @@ if lpstat -v 2>/dev/null | grep -q "^device for ${QUEUE}:"; then
             add_problem "Queue is an AirPrint/IPP queue - this is what triggers Error 853" ;;
     esac
 
-    if [ -n "$PRINTER_IP" ] && [ "$QUEUE_URI" != "lpd://$PRINTER_IP" ]; then
-        add_problem "Queue points at ${QUEUE_URI#*//}, but the printer is at $PRINTER_IP"
+    if [ -n "$PRINTER_IP" ] && [ "$(uri_host "$QUEUE_URI")" != "$PRINTER_IP" ]; then
+        add_problem "Queue points at $(uri_host "$QUEUE_URI"), but the printer is at $PRINTER_IP"
     fi
 else
     say "  queue   : MISSING"
